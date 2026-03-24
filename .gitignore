@@ -1,0 +1,14 @@
+cache.json
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+venv/
+env/
+.env
+
+*.log
+
+output/
