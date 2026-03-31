@@ -83,8 +83,8 @@ winget install ffmpeg
 
 **1. Clone the repository**
 ```bash
-git clone https://github.com/yourusername/playlist-audio-downloader.git
-cd playlist-audio-downloader
+git clone https://github.com/radhika342/playlist_downloader.git
+cd playlist_downloader
 ```
 
 **2. Create and activate a virtual environment**
