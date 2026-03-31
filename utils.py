@@ -28,6 +28,9 @@ def retry(func, retries=3, delay=2):
         try:
             return func()
         except Exception as e:
+            # Don't retry quota errors
+            if "quotaExceeded" in str(e):
+                raise
             logger.warning(f"Attempt {attempt + 1} failed: {e}")
             time.sleep(delay * (2 ** attempt))
     logger.error(f"All {retries} attempts failed for {func.__name__}")
