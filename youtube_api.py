@@ -1,5 +1,6 @@
 import os
 import json
+import googleapiclient.errors
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 from utils import logger, retry
@@ -31,16 +32,10 @@ def get_youtube_client():
         raise ValueError("YOUTUBE_API_KEY not found in .env")
     return build("youtube", "v3", developerKey=api_key)
 
-# Search for a song
+# Search for a single song
 
 
 def search_song(youtube, title):
-    cache = load_cache()
-
-    if title in cache:
-        logger.info(f"Cache hit: {title}")
-        return cache[title]
-
     def _search():
         response = youtube.search().list(
             q=title + " official audio",
@@ -51,7 +46,14 @@ def search_song(youtube, title):
         ).execute()
         return response
 
-    response = retry(_search)
+    try:
+        response = retry(_search)
+    except googleapiclient.errors.HttpError as e:
+        if e.resp.status == 403:
+            logger.error(
+                "Quota exceeded — stopping all searches for today. Re-run tomorrow, cached songs will be skipped.")
+            raise SystemExit(1)
+        raise
 
     if not response or not response.get("items"):
         logger.warning(f"No results found for: {title}")
@@ -59,23 +61,35 @@ def search_song(youtube, title):
 
     video_id = response["items"][0]["id"]["videoId"]
     url = f"https://www.youtube.com/watch?v={video_id}"
-
-    cache[title] = url
-    save_cache(cache)
-
-    logger.info(f"Found: {title} → {url}")
     return url
 
 # Search all songs
 
 
 def search_all_songs(titles):
-    youtube = get_youtube_client()
+    cache = load_cache()
     results = {}
+    uncached = []
 
+    # Split titles into cached and uncached
     for title in titles:
-        url = search_song(youtube, title)
-        results[title] = url
+        if title in cache:
+            logger.info(f"Cache hit: {title}")
+            results[title] = cache[title]
+        else:
+            uncached.append(title)
+
+    logger.info(f"{len(results)} from cache, {len(uncached)} need searching")
+
+    # Only build client if there's anything to search
+    if uncached:
+        youtube = get_youtube_client()
+        for title in uncached:
+            url = search_song(youtube, title)
+            results[title] = url
+            if url:
+                cache[title] = url
+                save_cache(cache)
 
     logger.info(
         f"YouTube search complete. {sum(1 for v in results.values() if v)} / {len(titles)} found")
