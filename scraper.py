@@ -1,3 +1,4 @@
+import re
 import requests
 from bs4 import BeautifulSoup
 from utils import logger, retry
@@ -45,15 +46,28 @@ def parse_song_titles(html, css_selector):
 
 
 def clean_titles(titles):
-    import re
+    junk_keywords = [
+        "songwriter", "producer", "writer", "label",
+        "album", "released", "genre", "featuring", "credits"
+    ]
+
     cleaned = []
     for t in titles:
         t = re.sub(r"^\d+[\.\)]\s*", "", t)
         t = re.sub(r"\(feat\..*?\)", "", t, flags=re.IGNORECASE)
         t = re.sub(r"\[.*?\]", "", t)
         t = t.strip()
-        if t:
-            cleaned.append(t)
+
+        if not t:
+            continue
+        if len(t) < 2:
+            continue
+        if any(junk.lower() in t.lower() for junk in junk_keywords):
+            logger.info(f"Skipping non-song entry: {t}")
+            continue
+
+        cleaned.append(t)
+
     cleaned = list(dict.fromkeys(cleaned))
     logger.info(f"{len(cleaned)} titles after cleaning")
     return cleaned
